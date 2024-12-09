@@ -48,23 +48,37 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	embedding, err := h.embedder.EmbedQuery(r.Context(), req.Text)
-	if err != nil {
-		h.log.Error("failed to embed query", slog.Any("error", err))
-		respond.WithError(w, "failed to embed query", http.StatusInternalServerError)
-		return
-	}
+	var docs []db.DocumentSelectNearestResult
 
-	//TODO: Add metrics for query time. Use partition as a dimension.
-	// Find the most similar documents.
-	docs, err := h.queries.DocumentNearest(r.Context(), db.DocumentSelectNearestArgs{
-		Partition: partition,
-		Embedding: embedding,
-		Limit:     h.maxContextDocs,
-	})
+	if !req.NoContext {
+		embedding, err := h.embedder.EmbedQuery(r.Context(), req.Text)
+		if err != nil {
+			h.log.Error("failed to embed query", slog.Any("error", err))
+			respond.WithError(w, "failed to embed query", http.StatusInternalServerError)
+			return
+		}
+
+		//TODO: Add metrics for query time. Use partition as a dimension.
+		// Find the most similar documents.
+		docs, err = h.queries.DocumentNearest(r.Context(), db.DocumentSelectNearestArgs{
+			Partition: partition,
+			Embedding: embedding,
+			Limit:     h.maxContextDocs,
+		})
+		if err != nil {
+			h.log.Error("failed to find nearest documents", slog.Any("error", err))
+			respond.WithError(w, "failed to find nearest documents", http.StatusInternalServerError)
+			return
+		}
+	}
 
 	var sb strings.Builder
 	for _, doc := range docs {
+		sb.WriteString("Context from ")
+		sb.WriteString(doc.Title)
+		sb.WriteString(" - ")
+		sb.WriteString(doc.URL)
+		sb.WriteString("\n")
 		sb.WriteString(doc.Text)
 		sb.WriteString("\n")
 	}
@@ -74,6 +88,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		respond.WithError(w, "failed to generate prompt", http.StatusInternalServerError)
 		return
 	}
+
+	h.log.Info("generated prompt", slog.String("prompt", prompt))
 
 	f := func(ctx context.Context, chunk []byte) error {
 		select {

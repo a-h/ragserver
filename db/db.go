@@ -48,14 +48,37 @@ type documentUpsertRowIDArgs struct {
 
 func (q *Queries) documentUpsertRowID(ctx context.Context, args documentUpsertRowIDArgs) (rowID int64, err error) {
 	stmt := gorqlite.ParameterizedStatement{
-		Query:     `insert into document (id, partition, url, title, summary, created_at, last_updated_at) values (?, ?, ?, ?, ?, ?, ?) on conflict(id) do update set partition = excluded.partition, url = excluded.url, title = excluded.title, summary = excluded.summary, last_updated_at = excluded.last_updated_at`,
+		Query: `insert into document (id, partition, url, title, summary, created_at, last_updated_at)
+values (?, ?, ?, ?, ?, ?, ?)
+on conflict(id) do update
+set
+    partition = excluded.partition,
+    url = excluded.url,
+    title = excluded.title,
+    summary = excluded.summary,
+    last_updated_at = excluded.last_updated_at
+`,
 		Arguments: []any{args.DocumentID.String(), args.Partition, args.URL, args.Title, args.Summary, args.CreatedAt, args.LastUpdatedAt},
 	}
-	result, err := q.conn.WriteOneParameterizedContext(ctx, stmt)
+	_, err = q.conn.WriteOneParameterizedContext(ctx, stmt)
 	if err != nil {
 		return 0, err
 	}
-	return result.LastInsertID, nil
+
+	// Read the row ID.
+	stmt = gorqlite.ParameterizedStatement{
+		Query:     `select rowid from document where id = ?`,
+		Arguments: []any{args.DocumentID.String()},
+	}
+	result, err := q.conn.QueryOneParameterizedContext(ctx, stmt)
+	if err != nil {
+		return 0, err
+	}
+	if !result.Next() {
+		return 0, fmt.Errorf("expected a row ID")
+	}
+	err = result.Scan(&rowID)
+	return rowID, err
 }
 
 type Document struct {
@@ -188,9 +211,31 @@ where headline_embedding match lembed('pandemic')
 */
 
 func (q *Queries) DocumentNearest(ctx context.Context, args DocumentSelectNearestArgs) (docs []DocumentSelectNearestResult, err error) {
+	inputEmbeddingJSON, err := json.Marshal(args.Embedding)
+	if err != nil {
+		return docs, fmt.Errorf("failed to marshal input embedding: %w", err)
+	}
 	stmt := gorqlite.ParameterizedStatement{
-		Query:     `select dcv.document_rowid, dcv.partition, dcv.idx, dcv.text, dcv.embedding, dcv.distance, d.url, d.title, d.summary from document_chunk_vec dcv join document d on d.rowid = dcv.document_rowid where dcv.partition = ? and dcv.embedding match ? order by dcv.distance asc limit ?`,
-		Arguments: []any{args.Partition, args.Embedding, args.Limit},
+		Query: `with limited_dcv as (
+  select document_rowid, partition, idx, text, embedding, distance
+  from document_chunk_vec
+  where partition = ? and embedding match ?
+  order by distance asc
+  limit ?
+)
+select 
+  ld.document_rowid,
+  ld.partition,
+  ld.idx,
+  ld.text,
+  vec_to_json(ld.embedding),
+  ld.distance,
+  d.url,
+  d.title,
+  d.summary
+from limited_dcv ld
+left join document d on d.rowid = ld.document_rowid;`,
+		Arguments: []any{args.Partition, string(inputEmbeddingJSON), args.Limit},
 	}
 	result, err := q.conn.QueryOneParameterizedContext(ctx, stmt)
 	if err != nil {
