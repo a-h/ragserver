@@ -89,7 +89,14 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.log.Info("generated prompt", slog.String("prompt", prompt))
+	docIDs := make([]db.DocumentID, 0, len(docs))
+	for i, doc := range docs {
+		docIDs[i] = db.DocumentID{
+			Partition: partition,
+			URL:       doc.URL,
+		}
+	}
+	h.log.Info("query context", slog.Any("docs", docIDs))
 
 	f := func(ctx context.Context, chunk []byte) error {
 		select {

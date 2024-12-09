@@ -109,33 +109,34 @@ func useItemOrDefault(item map[string]any, keys []string, defaultValue string) s
 func (p *PocketbaseExporter) createDocument(item map[string]any) (d models.Document) {
 	d.URL = useItemOrDefault(item, []string{"url"}, fmt.Sprintf("%s/%s", url.PathEscape(p.collection), url.PathEscape(item["id"].(string))))
 	d.Title = useItemOrDefault(item, []string{"title", "name"}, "Untitled")
-	d.Text = p.getText(item)
+	d.Text = getTextFromValue(0, item)
 	d.Summary = useItemOrDefault(item, []string{"summary"}, "")
 	return
 }
 
-func (p *PocketbaseExporter) getText(item map[string]any) string {
-	var sb strings.Builder
-	for key, value := range item {
-		sb.WriteString(fmt.Sprintf("%s: %s\n", key, getTextFromValue(value)))
-	}
-	return sb.String()
-}
-
-func getTextFromValue(value any) string {
+func getTextFromValue(depth int, value any) string {
 	switch v := value.(type) {
 	case map[string]any:
 		var sb strings.Builder
 		for key, item := range v {
-			sb.WriteString(fmt.Sprintf("%s: %s\n", key, getTextFromValue(item)))
+			sb.WriteString(strings.Repeat("#", depth+1))
+			sb.WriteString(" ")
+			sb.WriteString(key)
+			sb.WriteString("\n\n")
+			sb.WriteString(getTextFromValue(depth+1, item))
+			sb.WriteString("\n\n")
 		}
 		return sb.String()
+	case float64:
+		return fmt.Sprintf("%f", v)
 	case string:
 		return v
 	case []any:
 		var sb strings.Builder
-		for i, item := range v {
-			sb.WriteString(fmt.Sprintf("%d: %s\n", i, getTextFromValue(item)))
+		for _, item := range v {
+			sb.WriteString(" - ")
+			sb.WriteString(getTextFromValue(depth+1, item))
+			sb.WriteString("\n")
 		}
 		return sb.String()
 	default:
