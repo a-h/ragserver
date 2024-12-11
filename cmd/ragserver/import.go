@@ -2,12 +2,10 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"iter"
 	"log/slog"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/a-h/ragserver/client"
@@ -15,27 +13,26 @@ import (
 	"github.com/pluja/pocketbase"
 )
 
-func importCmd(ctx context.Context) (err error) {
-	flags := flag.NewFlagSet("import", flag.ExitOnError)
-	ragServerURL := flags.String("rag-server-url", "http://localhost:9020", "The URL of the RAG server.")
-	pocketbaseURL := flags.String("pocketbase-url", "http://localhost:8080", "The URL of the Pocketbase server.")
-	collectionName := flags.String("collection", "entities", "The name of the collection to export from.")
-	expand := flags.String("expand", "", "The fields to expand.")
-	level := flags.String("level", "info", "The log level to use, set to info for additional logs")
-	if err = flags.Parse(os.Args[2:]); err != nil {
-		return fmt.Errorf("failed to parse flags: %w", err)
-	}
-	log := getLogger(*level)
+type ImportCommand struct {
+	RAGServerURL  string `help:"The URL of the RAG server." env:"RAG_SERVER_URL" default:"http://localhost:9020"`
+	PocketbaseURL string `help:"The URL of the Pocketbase server." env:"POCKETBASE_URL" default:"http://localhost:8080"`
+	Collection    string `help:"The name of the collection to export from." env:"COLLECTION" default:"entities"`
+	Expand        string `help:"The fields to expand." env:"EXPAND" default:""`
+	LogLevel      string `help:"The log level to use." env:"LOG_LEVEL" default:"info"`
+}
 
-	c := client.New(*ragServerURL)
+func (c ImportCommand) Run(ctx context.Context) (err error) {
+	log := getLogger(c.LogLevel)
 
-	pbe := NewPocketbaseExporter(pocketbase.NewClient(*pocketbaseURL), *collectionName, *expand)
+	rsc := client.New(c.RAGServerURL)
+
+	pbe := NewPocketbaseExporter(pocketbase.NewClient(c.PocketbaseURL), c.Collection, c.Expand)
 	for doc := range pbe.Export(ctx) {
 		log.Info("importing document", slog.String("url", doc.URL))
 		if log.Enabled(ctx, slog.LevelInfo) {
 			fmt.Println(doc.Text)
 		}
-		resp, err := c.DocumentsPut(ctx, models.DocumentsPostRequest{
+		resp, err := rsc.DocumentsPut(ctx, models.DocumentsPostRequest{
 			Document: doc,
 		})
 		if err != nil {

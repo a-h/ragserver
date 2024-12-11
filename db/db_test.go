@@ -16,20 +16,20 @@ var initOnce sync.Once
 var conn *gorqlite.Connection
 
 func initConnection() (err error) {
+	url := "http://admin:secret@localhost:4001"
+	databaseURL, err := db.ParseRqliteURL(url)
+	if err != nil {
+		return fmt.Errorf("failed to parse rqlite URL: %w", err)
+	}
 	initOnce.Do(func() {
-		databaseURL := db.URL{
-			User:     "admin",
-			Password: "secret",
-			Host:     "localhost",
-			Port:     4001,
-			Secure:   false,
-		}
 		conn, err = gorqlite.Open(databaseURL.DataSourceName())
 		if err != nil {
 			err = fmt.Errorf("failed to open connection: %w", err)
+			return
 		}
 		if err = db.Migrate(databaseURL); err != nil {
 			err = fmt.Errorf("failed to migrate database: %w", err)
+			return
 		}
 	})
 	return err

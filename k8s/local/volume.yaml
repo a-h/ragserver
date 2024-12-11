@@ -1,0 +1,15 @@
+# This persistent volume is useful only for local development.
+# In production, we'll use a persistent volume claim from the
+# underlying k8s infrastructure.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: volume
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "${HOME}/k8s-volumes/ragserver/volume"
+  storageClassName: hostpath

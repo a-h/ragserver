@@ -1,10 +1,6 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
-    gomod2nix = {
-      url = "github:nix-community/gomod2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     gitignore = {
       url = "github:hercules-ci/gitignore.nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -19,7 +15,7 @@
     };
   };
 
-  outputs = { self, nixpkgs, gomod2nix, gitignore, xc, ollama2nix }:
+  outputs = { self, nixpkgs, gitignore, xc, ollama2nix }:
     let
       allSystems = [
         "x86_64-linux" # 64-bit Intel/AMD Linux
@@ -90,20 +86,19 @@
               ollama = (wrappedOllama system prev);
               ollama2nix = ollama2nix.packages.${system}.default;
               xc = xc.packages.${system}.xc;
-              gomod2nix = gomod2nix.legacyPackages.${system}.gomod2nix;
             })
           ];
         };
       });
 
       # Build app.
-      app = { name, pkgs, system }: gomod2nix.legacyPackages.${system}.buildGoApplication {
+      app = { name, pkgs, system }: pkgs.buildGoModule {
         name = name;
+        pname = name;
         src = gitignore.lib.gitignoreSource ./.;
         go = pkgs.go;
-        # Must be added due to bug https://github.com/nix-community/gomod2nix/issues/120
-        pwd = ./.;
         subPackages = [ "cmd/${name}" ];
+        vendorHash = null; # Use vendored dependencies.
         CGO_ENABLED = 0;
         flags = [
           "-trimpath"
@@ -134,10 +129,35 @@
           (app { inherit name pkgs system; })
         ];
         config = {
-          Cmd = [ name ];
+          Cmd = [ "ragserver" "serve" ];
           User = "user:user";
           ExposedPorts = {
             "9020/tcp" = { };
+          };
+        };
+      };
+
+      rqliteDockerImage = { pkgs, system }: pkgs.dockerTools.buildImage {
+        name = "rqlite";
+        tag = "latest";
+
+        copyToRoot = [
+          pkgs.coreutils
+          pkgs.bash
+          (dockerUser pkgs)
+          pkgs.rqlite
+          pkgs.sqlite-vec
+        ];
+        config = {
+          Entrypoint = [ "rqlited" "-http-addr" "0.0.0.0:4001" "-http-adv-addr" "rqlite.ragserver.svc.cluster.local:4001" "-raft-addr" "0.0.0.0:4002" "-raft-adv-addr" "rqlite.ragserver.svc.cluster.local:4002" "-auth" "/mnt/rqlite/auth.json" "-extensions-path" "${pkgs.sqlite-vec}/lib" "/mnt/data" ];
+          User = "user:user";
+          ExposedPorts = {
+            "4001/tcp" = { };
+            "4002/tcp" = { };
+            "4003/tcp" = { };
+          };
+          Volumes = {
+            "/rqlite/file" = { };
           };
         };
       };
@@ -150,7 +170,8 @@
         pkgs.git
         pkgs.go
         pkgs.xc
-        pkgs.gomod2nix
+        pkgs.envsubst
+        pkgs.k9s
         # Database tools.
         pkgs.rqlite # Distributed sqlite.
         pkgs.go-migrate # Migrate database schema.
@@ -169,9 +190,9 @@
       packages = forAllSystems ({ system, pkgs }: {
         default = app { name = name; pkgs = pkgs; system = system; };
         docker-image = dockerImage { name = name; pkgs = pkgs; system = system; };
+        rqlite-docker-image = rqliteDockerImage { pkgs = pkgs; system = system; };
       });
       # `nix develop` provides a shell containing required tools.
-      # Run `gomod2nix` to update the `gomod2nix.toml` file if Go dependencies change.
       devShells = forAllSystems ({ system, pkgs }: {
         default = pkgs.mkShell {
           buildInputs = (devTools { system = system; pkgs = pkgs; });

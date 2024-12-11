@@ -2,67 +2,30 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 
 	_ "embed"
+
+	"github.com/alecthomas/kong"
 )
 
-var version string
+type CLI struct {
+	Serve   ServeCommand   `cmd:"serve" help:"Start the RAG server."`
+	Import  ImportCommand  `cmd:"import" help:"Import documents into a RAG server."`
+	Query   QueryCommand   `cmd:"query" help:"Query the RAG store and LLM."`
+	Version VersionCommand `cmd:"version" help:"Print the version of the RAG server."`
+}
 
 func main() {
-	if len(os.Args) < 2 || os.Args[1] == "--help" || os.Args[1] == "-h" {
-		printUsage()
-		os.Exit(1)
-	}
+	var cli CLI
 	ctx := context.Background()
-	var err error
-
-	switch os.Args[1] {
-	case "version":
-		fallthrough
-	case "-v":
-		fallthrough
-	case "--version":
-		fallthrough
-	case "-version":
-		fmt.Println(version)
-	case "serve":
-		err = serveCmd(ctx)
-	case "import":
-		err = importCmd(ctx)
-	case "query":
-		err = queryCmd(ctx)
-	default:
-		fmt.Printf("unknown command %q\n", os.Args[1])
-		fmt.Println()
-		printUsage()
-	}
-
-	if err != nil {
+	kctx := kong.Parse(&cli, kong.UsageOnError(), kong.BindTo(ctx, (*context.Context)(nil)))
+	if err := kctx.Run(); err != nil {
 		log := getLogger("error")
 		log.Error("error", slog.Any("error", err))
 		os.Exit(1)
 	}
-}
-
-func printUsage() {
-	fmt.Println(`ragserver is a JSON API that provides Retrieval Augmented Generation for an LLM.
-
-Usage:
-
-  ragserver serve
-    - Start the RAG server.
-
-  ragserver import
-    - Import documents into a RAG server.
-
-  ragserver query
-    - Query the RAG store and LLM.
-
-  ragserver version
-    - Print the version of the RAG server.`)
 }
 
 func getLogger(level string) *slog.Logger {

@@ -2,35 +2,32 @@ package main
 
 import (
 	"context"
-	"flag"
-	"fmt"
 	"os"
 
 	"github.com/a-h/ragserver/client"
 	"github.com/a-h/ragserver/models"
 )
 
-func queryCmd(ctx context.Context) (err error) {
-	flags := flag.NewFlagSet("query", flag.ExitOnError)
-	ragServerURL := flags.String("rag-server-url", "http://localhost:9020", "The URL of the RAG server.")
-	nocontext := flags.Bool("no-context", false, "Do not use context.")
-	query := flags.String("q", "", "The query to send.")
-	level := flags.String("level", "info", "The log level to use, set to info for additional logs")
-	if err = flags.Parse(os.Args[2:]); err != nil {
-		return fmt.Errorf("failed to parse flags: %w", err)
-	}
-	log := getLogger(*level)
-	if *nocontext {
+type QueryCommand struct {
+	RAGServerURL string `help:"The URL of the RAG server." env:"RAG_SERVER_URL" default:"http://localhost:9020"`
+	NoContext    bool   `help:"Do not use context." env:"NO_CONTEXT" default:"false"`
+	Query        string `help:"The query to send." short:"q"`
+	LogLevel     string `help:"The log level to use." env:"LOG_LEVEL" default:"info"`
+}
+
+func (c QueryCommand) Run(ctx context.Context) (err error) {
+	log := getLogger(c.LogLevel)
+	if c.NoContext {
 		log.Info("Querying without context")
 	}
 
-	c := client.New(*ragServerURL)
+	rsc := client.New(c.RAGServerURL)
 	f := func(ctx context.Context, chunk []byte) error {
 		_, err := os.Stdout.Write(chunk)
 		return err
 	}
-	return c.QueryPost(ctx, models.QueryPostRequest{
-		Text:      *query,
-		NoContext: *nocontext,
+	return rsc.QueryPost(ctx, models.QueryPostRequest{
+		Text:      c.Query,
+		NoContext: c.NoContext,
 	}, f)
 }

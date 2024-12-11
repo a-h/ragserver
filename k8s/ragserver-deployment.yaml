@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    service: ragserver
+  name: ragserver
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      service: ragserver
+  template:
+    metadata:
+      labels:
+        service: ragserver
+    spec:
+      containers:
+        - image: ragserver:latest
+          imagePullPolicy: IfNotPresent
+          name: ragserver
+          ports:
+            - containerPort: 9020
+              hostPort: 9020
+              protocol: TCP
+          env:
+            - name: RQLITE_URL
+              value: http://admin:secret@rqlite.ragserver.svc.cluster.local:4001
+            - name: OLLAMA_URL
+              value: http://127.0.0.1:11434
+      restartPolicy: Always

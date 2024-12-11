@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    service: rqlite
+  name: rqlite
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: rqlite
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        service: rqlite
+    spec:
+      # Should mount auth.json as a k8s secret.
+      # docker run -v "$PWD/auth.json:/mnt/rqlite/auth.json" -v "$PWD/.rqlite:/mnt/data" -p 4001:4001 -p 4002:4002 -p 4003:4003 rqlite:latest
+      containers:
+        - image: rqlite:latest
+          imagePullPolicy: IfNotPresent
+          name: rqlite
+          ports:
+            - containerPort: 4001
+              protocol: TCP
+            - containerPort: 4002
+              protocol: TCP
+            - containerPort: 4003
+              protocol: TCP
+          volumeMounts:
+            - name: rqlite-data
+              mountPath: /mnt/data
+            - name: rqlite-auth
+              mountPath: /mnt/rqlite
+              readOnly: true
+      restartPolicy: Always
+      volumes:
+        - name: rqlite-data
+          persistentVolumeClaim:
+            claimName: rqlite-data
+        - name: rqlite-auth
+          secret:
+            secretName: rqlite-auth
