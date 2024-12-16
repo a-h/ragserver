@@ -20,8 +20,8 @@ spec:
         service: ragserver
     spec:
       containers:
-        - image: ragserver:latest
-          imagePullPolicy: IfNotPresent
+        - image: ${CONTAINER_REGISTRY}/ragserver:v0.0.1
+          imagePullPolicy: Always
           name: ragserver
           ports:
             - containerPort: 9020
@@ -31,5 +31,5 @@ spec:
             - name: RQLITE_URL
               value: http://admin:secret@rqlite.ragserver.svc.cluster.local:4001
             - name: OLLAMA_URL
-              value: http://127.0.0.1:11434
+              value: http://host.docker.internal:11434
       restartPolicy: Always

@@ -19,8 +19,8 @@ spec:
       # Should mount auth.json as a k8s secret.
       # docker run -v "$PWD/auth.json:/mnt/rqlite/auth.json" -v "$PWD/.rqlite:/mnt/data" -p 4001:4001 -p 4002:4002 -p 4003:4003 rqlite:latest
       containers:
-        - image: rqlite:latest
-          imagePullPolicy: IfNotPresent
+        - image: ${CONTAINER_REGISTRY}/rqlite:v0.0.1
+          imagePullPolicy: Always
           name: rqlite
           ports:
             - containerPort: 4001
@@ -35,6 +35,10 @@ spec:
             - name: rqlite-auth
               mountPath: /mnt/rqlite
               readOnly: true
+      securityContext:
+        fsGroup: 1000
+      imagePullSecrets:
+        - name: regcred
       restartPolicy: Always
       volumes:
         - name: rqlite-data

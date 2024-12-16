@@ -86,6 +86,17 @@ nix build .#packages.aarch64-linux.docker-image
 nix build .#packages.x86_64-linux.docker-image
 ```
 
+### crane-push-app
+
+env: CONTAINER_REGISTRY=ghcr.io/ragserver
+
+```bash
+nix build .#packages.x86_64-linux.docker-image
+cp ./result /tmp/ragserver.tar.gz
+gunzip -f /tmp/ragserver.tar.gz
+crane push /tmp/ragserver.tar ${CONTAINER_REGISTRY}/ragserver:v0.0.1
+```
+
 ### docker-load
 
 Once you've built the image, you can load it into a local Docker daemon with `docker load`.
@@ -110,6 +121,17 @@ nix build .#packages.aarch64-linux.rqlite-docker-image
 
 ```bash
 nix build .#packages.x86_64-linux.rqlite-docker-image
+```
+
+### crane-push-rqlite
+
+env: CONTAINER_REGISTRY=ghcr.io/ragserver
+
+```bash
+nix build .#packages.x86_64-linux.rqlite-docker-image
+cp ./result /tmp/rqlite.tar.gz
+gunzip -f /tmp/rqlite.tar.gz
+crane push /tmp/rqlite.tar ${CONTAINER_REGISTRY}/rqlite:v0.0.1
 ```
 
 ### docker-load-rqlite
@@ -150,11 +172,12 @@ envsubst < k8s/local/volume.yaml | kubectl --namespace ragserver apply -f -
 
 ### k8s-apply
 
+env: CONTAINER_REGISTRY=ghcr.io/ragserver
 dir: k8s
 interactive: true
 
 ```bash
-kubectl apply --namespace ragserver -f .
+for f in *.yaml; do envsubst < $f | kubectl apply --namespace ragserver -f -; done
 ```
 
 ### k8s-local-expose-ports
@@ -174,5 +197,5 @@ kubectl logs -n ragserver -l service=ragserver
 ### k8s-get-logs-rqlite
 
 ```bash
-kubectl logs -n ragserver -l service=pocketbase
+kubectl logs -n ragserver -l service=rqlite
 ```
