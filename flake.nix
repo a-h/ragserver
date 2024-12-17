@@ -171,6 +171,7 @@
         pkgs.go
         pkgs.xc
         pkgs.envsubst
+        pkgs.kubectl
         pkgs.k9s
         # Database tools.
         pkgs.rqlite # Distributed sqlite.
