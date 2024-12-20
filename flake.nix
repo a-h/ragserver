@@ -9,13 +9,9 @@
       url = "github:joerdav/xc";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    ollama2nix = {
-      url = "github:a-h/ollama2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
-  outputs = { self, nixpkgs, gitignore, xc, ollama2nix }:
+  outputs = { self, nixpkgs, gitignore, xc }:
     let
       allSystems = [
         "x86_64-linux" # 64-bit Intel/AMD Linux
@@ -23,30 +19,6 @@
         "x86_64-darwin" # 64-bit Intel macOS
         "aarch64-darwin" # 64-bit ARM macOS
       ];
-
-      # Wrap ollama so that we can set environment variables to provide models.
-      wrappedOllama = system: pkgs:
-        let
-          models = pkgs.symlinkJoin {
-            name = "models";
-            paths = [
-              (import ./mistral-nemo.nix { pkgs = pkgs; })
-              (import ./nomic-embed-text.nix { pkgs = pkgs; })
-            ];
-          };
-          wrapped = pkgs.writeShellScriptBin "ollama" ''
-            export OLLAMA_MODELS="${models}"
-            exec ${pkgs.ollama}/bin/ollama "$@"
-          '';
-        in
-        pkgs.symlinkJoin {
-          name = "ollama";
-          paths = [
-            models
-            wrapped
-            pkgs.ollama
-          ];
-        };
 
       forAllSystems = f: nixpkgs.lib.genAttrs allSystems (system: f {
         system = system;
@@ -83,8 +55,6 @@
                   runHook postInstall
                 '';
               });
-              ollama = (wrappedOllama system prev);
-              ollama2nix = ollama2nix.packages.${system}.default;
               xc = xc.packages.${system}.xc;
             })
           ];
@@ -178,9 +148,6 @@
         pkgs.go-migrate # Migrate database schema.
         # Vector extension.
         pkgs.sqlite-vec
-        # LLM tools.
-        pkgs.ollama
-        pkgs.ollama2nix
       ];
 
       name = "ragserver";

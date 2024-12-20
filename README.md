@@ -44,12 +44,6 @@ interactive: true
 go run ./cmd/ragserver query --no-context -q "What is the plan to destroy the Death Star?"
 ```
 
-### ollama-serve
-
-```bash
-ollama serve
-```
-
 ### gomod2nix-update
 
 ```bash
