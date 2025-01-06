@@ -1,4 +1,4 @@
 {
-  "test-api-key": "test-partition",
-  "test-api-key-no-llm": "test-partition-no-llm"
+  "test-api-key": "test-user",
+  "test-api-key-no-llm": "test-user-no-llm"
 }

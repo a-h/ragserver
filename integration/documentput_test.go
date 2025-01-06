@@ -12,7 +12,7 @@ func TestDocumentPut(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	c := client.New("http://localhost:9020")
+	c := client.New("http://localhost:9020", "test-api-key-no-llm")
 	_, err := c.DocumentsPut(context.Background(), models.DocumentsPostRequest{
 		Document: models.Document{
 			URL:     "/test",

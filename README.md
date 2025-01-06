@@ -22,6 +22,8 @@ go test ./...
 
 ### serve
 
+ENV: RQLITE_URL=http://admin:secret@localhost:4001
+
 ```bash
 go run ./cmd/ragserver/ serve
 ```
@@ -154,12 +156,13 @@ docker run -v "$PWD/auth.json:/mnt/rqlite/auth.json" -v "$PWD/.rqlite:/mnt/data"
 kubectl create namespace ragserver
 ```
 
-### k8s-create-secret
+### k8s-create-secrets
 
 Need to create auth.json as a k8s secret.
 
 ```bash
 kubectl -n ragserver create secret generic rqlite-auth --from-file=auth.json
+kubectl -n ragserver create secret generic ragserver-apikeys --from-file=apikeys.json
 ```
 
 ### k8s-local-create-volume

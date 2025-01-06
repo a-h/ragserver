@@ -12,14 +12,16 @@ import (
 	"github.com/a-h/ragserver/models"
 )
 
-func New(baseURL string) Client {
+func New(baseURL, apiKey string) Client {
 	return Client{
 		baseURL: baseURL,
+		apiKey:  apiKey,
 	}
 }
 
 type Client struct {
 	baseURL string
+	apiKey  string
 }
 
 func (c Client) DocumentsPut(ctx context.Context, req models.DocumentsPostRequest) (resp models.DocumentsPostResponse, err error) {
@@ -27,7 +29,7 @@ func (c Client) DocumentsPut(ctx context.Context, req models.DocumentsPostReques
 	if err != nil {
 		return resp, err
 	}
-	return jsonapi.Post[models.DocumentsPostRequest, models.DocumentsPostResponse](ctx, url, req)
+	return jsonapi.Post[models.DocumentsPostRequest, models.DocumentsPostResponse](ctx, url, req, jsonapi.WithRequestHeader("Authorization", c.apiKey))
 }
 
 func (c Client) QueryPost(ctx context.Context, request models.QueryPostRequest, f func(ctx context.Context, chunk []byte) error) (err error) {
@@ -40,7 +42,7 @@ func (c Client) QueryPost(ctx context.Context, request models.QueryPostRequest, 
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(buf))
-	res, err := jsonapi.Raw(httpReq)
+	res, err := jsonapi.Raw(httpReq, jsonapi.WithRequestHeader("Authorization", c.apiKey))
 	if err != nil {
 		return fmt.Errorf("failed to perform HTTP request: %w", err)
 	}
@@ -54,14 +56,14 @@ func (c Client) QueryPost(ctx context.Context, request models.QueryPostRequest, 
 	}
 	for {
 		chunk := make([]byte, 1024)
-		_, err := res.Body.Read(chunk)
+		n, err := res.Body.Read(chunk)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return fmt.Errorf("failed to read response body: %w", err)
 		}
-		if err := f(ctx, chunk); err != nil {
+		if err := f(ctx, chunk[:n]); err != nil {
 			return fmt.Errorf("failed to process chunk: %w", err)
 		}
 	}

@@ -35,7 +35,7 @@ type Handler struct {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	partition, ok := auth.GetUser(r)
+	user, ok := auth.GetUser(r)
 	if !ok {
 		http.Error(w, "authentication not provided", http.StatusUnauthorized)
 		return
@@ -53,6 +53,12 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error("failed to split text", slog.Any("error", err))
 		respond.WithError(w, "failed to split text", http.StatusInternalServerError)
+		return
+	}
+
+	// If this is a test API key, don't use the LLM.
+	if user == "test-user-no-llm" {
+		respond.WithJSON(w, models.DocumentsPostResponse{ID: 123}, http.StatusOK)
 		return
 	}
 
@@ -82,7 +88,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	resp.ID, err = h.queries.DocumentPut(r.Context(), db.DocumentPutArgs{
 		Document: db.Document{
 			DocumentID: db.DocumentID{
-				Partition: partition,
+				Partition: user,
 				URL:       req.Document.URL,
 			},
 			Title:   req.Document.Title,

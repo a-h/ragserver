@@ -27,9 +27,18 @@ spec:
             - containerPort: 9020
               hostPort: 9020
               protocol: TCP
+          volumeMounts:
+            - name: ragserver-apikeys
+              mountPath: /mnt/secrets/apikeys
           env:
             - name: RQLITE_URL
               value: http://admin:secret@rqlite.ragserver.svc.cluster.local:4001
+            - name: API_KEYS_FILE
+              value: /mnt/secrets/apikeys/apikeys.json
             - name: OLLAMA_URL
               value: http://host.docker.internal:11434
       restartPolicy: Always
+      volumes:
+        - name: ragserver-apikeys
+          secret:
+            secretName: ragserver-apikeys

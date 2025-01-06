@@ -3,8 +3,10 @@ package post
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/a-h/ragserver/auth"
@@ -38,7 +40,7 @@ type Handler struct {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	partition, ok := auth.GetUser(r)
+	user, ok := auth.GetUser(r)
 	if !ok {
 		http.Error(w, "authentication not provided", http.StatusUnauthorized)
 		return
@@ -49,6 +51,12 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.log.Error("failed to decode body", slog.Any("error", err))
 		respond.WithError(w, "failed to decode body", http.StatusBadRequest)
+		return
+	}
+
+	// If this is a test API key, don't use the LLM.
+	if user == "test-user-no-llm" {
+		writeTestMessage(w)
 		return
 	}
 
@@ -65,7 +73,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		//TODO: Add metrics for query time. Use partition as a dimension.
 		// Find the most similar documents.
 		docs, err = h.queries.DocumentNearest(r.Context(), db.DocumentSelectNearestArgs{
-			Partition: partition,
+			Partition: user,
 			Embedding: embedding,
 			Limit:     h.maxContextDocs,
 		})
@@ -96,7 +104,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	docIDs := make([]db.DocumentID, 0, len(docs))
 	for i, doc := range docs {
 		docIDs[i] = db.DocumentID{
-			Partition: partition,
+			Partition: user,
 			URL:       doc.URL,
 		}
 	}
@@ -126,4 +134,18 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		respond.WithError(w, "failed to generate content", http.StatusInternalServerError)
 		return
 	}
+}
+
+const TestMessage = `Hello! I'm a test message. I'm here to help you test your integration with the API. If you can see me, then your integration is working!`
+
+func writeTestMessage(w http.ResponseWriter) (err error) {
+	for chunk := range slices.Chunk([]rune(TestMessage), 4) {
+		if _, err := io.WriteString(w, string(chunk)); err != nil {
+			return err
+		}
+		if flusher, canFlush := w.(http.Flusher); canFlush {
+			flusher.Flush()
+		}
+	}
+	return nil
 }

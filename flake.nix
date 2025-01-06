@@ -139,6 +139,7 @@
         pkgs.gh
         pkgs.git
         pkgs.go
+        pkgs.gopls
         pkgs.xc
         pkgs.envsubst
         pkgs.kubectl

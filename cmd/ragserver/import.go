@@ -14,17 +14,18 @@ import (
 )
 
 type ImportCommand struct {
-	RAGServerURL  string `help:"The URL of the RAG server." env:"RAG_SERVER_URL" default:"http://localhost:9020"`
-	PocketbaseURL string `help:"The URL of the Pocketbase server." env:"POCKETBASE_URL" default:"http://localhost:8080"`
-	Collection    string `help:"The name of the collection to export from." env:"COLLECTION" default:"entities"`
-	Expand        string `help:"The fields to expand." env:"EXPAND" default:""`
-	LogLevel      string `help:"The log level to use." env:"LOG_LEVEL" default:"info"`
+	RAGServerURL    string `help:"The URL of the RAG server." env:"RAG_SERVER_URL" default:"http://localhost:9020"`
+	RAGServerAPIKey string `help:"The API key for the RAG server." env:"RAG_SERVER_API_KEY" default:""`
+	PocketbaseURL   string `help:"The URL of the Pocketbase server." env:"POCKETBASE_URL" default:"http://localhost:8080"`
+	Collection      string `help:"The name of the collection to export from." env:"COLLECTION" default:"entities"`
+	Expand          string `help:"The fields to expand." env:"EXPAND" default:""`
+	LogLevel        string `help:"The log level to use." env:"LOG_LEVEL" default:"info"`
 }
 
 func (c ImportCommand) Run(ctx context.Context) (err error) {
 	log := getLogger(c.LogLevel)
 
-	rsc := client.New(c.RAGServerURL)
+	rsc := client.New(c.RAGServerURL, c.RAGServerAPIKey)
 
 	pbe := NewPocketbaseExporter(pocketbase.NewClient(c.PocketbaseURL), c.Collection, c.Expand)
 	for doc := range pbe.Export(ctx) {
