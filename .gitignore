@@ -4,3 +4,4 @@ result
 coverage.out
 # rqlite data directory.
 .rqlite
+nix-export.tar.gz

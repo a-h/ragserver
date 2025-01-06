@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/a-h/ragserver/auth"
 	"github.com/a-h/ragserver/db"
 	"github.com/a-h/ragserver/models"
 	"github.com/a-h/respond"
@@ -34,8 +35,11 @@ type Handler struct {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	//TODO: Get the partition from the user ID.
-	var partition = "test-partition"
+	partition, ok := auth.GetUser(r)
+	if !ok {
+		http.Error(w, "authentication not provided", http.StatusUnauthorized)
+		return
+	}
 
 	var req models.DocumentsPostRequest
 	err := json.NewDecoder(r.Body).Decode(&req)

@@ -14,6 +14,12 @@ rqlited -auth=auth.json -extensions-path="${SQLITE_VEC_PATH}" ~/ragserver
 migrate create -ext sql -dir db/migrations -seq create_documents_table
 ```
 
+### test
+
+```bash
+go test ./...
+```
+
 ### serve
 
 ```bash

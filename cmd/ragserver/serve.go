@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/a-h/ragserver/auth"
 	"github.com/a-h/ragserver/db"
 	documentspost "github.com/a-h/ragserver/handlers/documents/post"
 	querypost "github.com/a-h/ragserver/handlers/query/post"
@@ -24,6 +26,9 @@ type ServeCommand struct {
 	UserPrompt     string `help:"The user prompt to use." env:"USER_PROMPT" default:""`
 	MaxContextDocs int    `help:"The maximum number of context documents to use." env:"MAX_CONTEXT_DOCS" default:"5"`
 	ListenAddr     string `help:"The address to listen on." env:"LISTEN_ADDR" default:"localhost:9020"`
+	TLSCertFile    string `help:"The TLS certificate file." env:"TLS_CERT_FILE" default:""`
+	TLSKeyFile     string `help:"The TLS key file." env:"TLS_KEY_FILE" default:""`
+	APIKeysFile    string `help:"The file containing a JSON map of API keys to usernames." env:"API_KEYS_FILE" default:"apikeys.json"`
 	LogLevel       string `help:"The log level to use." env:"LOG_LEVEL" default:"info"`
 }
 
@@ -113,6 +118,29 @@ func (c ServeCommand) Run(ctx context.Context) (err error) {
 	qph := querypost.New(log, emb, llmc, queries, c.MaxContextDocs, systemPrompt, pf)
 	mux.Handle("POST /query", qph)
 
-	log.Info("listening", slog.String("addr", c.ListenAddr))
-	return http.ListenAndServe(c.ListenAddr, mux)
+	apiKeyToUserName, err := auth.LoadFromFile(c.APIKeysFile)
+	if err != nil {
+		return fmt.Errorf("failed to load API keys: %w", err)
+	}
+	authenticatedMux := auth.New(apiKeyToUserName, mux)
+
+	log.Info("Listening", slog.String("addr", c.ListenAddr))
+	s := &http.Server{
+		Addr:    c.ListenAddr,
+		Handler: authenticatedMux,
+	}
+	if c.TLSCertFile != "" && c.TLSKeyFile != "" {
+		log.Info("Enabling TLS mode")
+		var cert tls.Certificate
+		cert, err = tls.LoadX509KeyPair(c.TLSCertFile, c.TLSKeyFile)
+		if err != nil {
+			return fmt.Errorf("failed to load cert: %w", err)
+		}
+		s.TLSConfig = &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: []tls.Certificate{cert},
+		}
+		return s.ListenAndServeTLS(c.TLSCertFile, c.TLSKeyFile)
+	}
+	return http.ListenAndServe(c.ListenAddr, authenticatedMux)
 }
