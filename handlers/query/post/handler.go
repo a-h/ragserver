@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/a-h/ragserver/auth"
 	"github.com/a-h/ragserver/db"
@@ -136,7 +137,13 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-const TestMessage = `Hello! I'm a test message. I'm here to help you test your integration with the API. If you can see me, then your integration is working!`
+const TestMessage = `Hello!
+
+I'm a test message.
+
+I'm here to help you test your integration with the API.
+
+If you can see me, then your integration is working!`
 
 func writeTestMessage(w http.ResponseWriter) (err error) {
 	for chunk := range slices.Chunk([]rune(TestMessage), 4) {
@@ -146,6 +153,7 @@ func writeTestMessage(w http.ResponseWriter) (err error) {
 		if flusher, canFlush := w.(http.Flusher); canFlush {
 			flusher.Flush()
 		}
+		time.Sleep(100 * time.Millisecond)
 	}
 	return nil
 }

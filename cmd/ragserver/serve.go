@@ -13,6 +13,7 @@ import (
 	documentspost "github.com/a-h/ragserver/handlers/documents/post"
 	querypost "github.com/a-h/ragserver/handlers/query/post"
 	"github.com/rqlite/gorqlite"
+	"github.com/rs/cors"
 	"github.com/tmc/langchaingo/embeddings"
 	"github.com/tmc/langchaingo/llms/ollama"
 )
@@ -123,11 +124,12 @@ func (c ServeCommand) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed to load API keys: %w", err)
 	}
 	authenticatedMux := auth.New(apiKeyToUserName, mux)
+	withCORSAuthenticatedMux := cors.AllowAll().Handler(authenticatedMux)
 
 	log.Info("Listening", slog.String("addr", c.ListenAddr))
 	s := &http.Server{
 		Addr:    c.ListenAddr,
-		Handler: authenticatedMux,
+		Handler: withCORSAuthenticatedMux,
 	}
 	if c.TLSCertFile != "" && c.TLSKeyFile != "" {
 		log.Info("Enabling TLS mode")
@@ -142,5 +144,5 @@ func (c ServeCommand) Run(ctx context.Context) (err error) {
 		}
 		return s.ListenAndServeTLS(c.TLSCertFile, c.TLSKeyFile)
 	}
-	return http.ListenAndServe(c.ListenAddr, authenticatedMux)
+	return s.ListenAndServe()
 }

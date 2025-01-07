@@ -66,6 +66,10 @@ github.com/pluja/pocketbase
 # github.com/rqlite/gorqlite v0.0.0-20241013203532-4385768ae85d
 ## explicit; go 1.17
 github.com/rqlite/gorqlite
+# github.com/rs/cors v1.11.1
+## explicit; go 1.13
+github.com/rs/cors
+github.com/rs/cors/internal
 # github.com/tmc/langchaingo v0.1.12
 ## explicit; go 1.22.0
 github.com/tmc/langchaingo/callbacks

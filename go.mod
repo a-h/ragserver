@@ -5,16 +5,17 @@ go 1.23.1
 require (
 	github.com/a-h/jsonapi v0.0.0-20241203172400-671152cf5705
 	github.com/a-h/respond v0.0.2
+	github.com/alecthomas/kong v1.6.0
 	github.com/golang-migrate/migrate/v4 v4.18.1
 	github.com/google/go-cmp v0.6.0
 	github.com/pluja/pocketbase v0.1.0
 	github.com/rqlite/gorqlite v0.0.0-20241013203532-4385768ae85d
+	github.com/rs/cors v1.11.1
 	github.com/tmc/langchaingo v0.1.12
 )
 
 require (
 	github.com/SierraSoftworks/multicast/v2 v2.0.0 // indirect
-	github.com/alecthomas/kong v1.6.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/donovanhide/eventsource v0.0.0-20210830082556-c59027999da0 // indirect
