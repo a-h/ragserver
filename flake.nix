@@ -27,14 +27,14 @@
           overlays = [
             (final: prev: {
               rqlite = prev.rqlite.overrideAttrs (oldAttrs: {
-                version = "8.34.2";
+                version = "8.36.4";
                 src = prev.fetchFromGitHub {
                   owner = "rqlite";
                   repo = "rqlite";
-                  rev = "v8.34.2";
-                  hash = "sha256-+/D5sHDzhBmF6C1JKGaEJSVdcIyU8o9n0qc1/xEoxjo=";
+                  rev = "v8.36.3";
+                  hash = "sha256-Q5taKIs3kjB1KrIxRO27/sbhamta9ljO+btghJ+M5zE=";
                 };
-                vendorHash = "sha256-v30TFML8RBn02LaNDQ0LBbhJduQUZDEBUCSSDwW2Ixo=";
+                vendorHash = "sha256-lMDE8M8O6HIJE585OaI1islvffVHncr5CwLoVVSCOh4=";
               });
               sqlite-vec = prev.sqlite-vec.overrideAttrs (oldAttrs: {
                 version = "0.1.6";

@@ -10,6 +10,8 @@ import (
 
 	"github.com/a-h/ragserver/auth"
 	"github.com/a-h/ragserver/db"
+	chatpost "github.com/a-h/ragserver/handlers/chat/post"
+	contextpost "github.com/a-h/ragserver/handlers/context/post"
 	documentspost "github.com/a-h/ragserver/handlers/documents/post"
 	querypost "github.com/a-h/ragserver/handlers/query/post"
 	"github.com/rqlite/gorqlite"
@@ -115,6 +117,12 @@ func (c ServeCommand) Run(ctx context.Context) (err error) {
 
 	dah := documentspost.New(log, emb, queries)
 	mux.Handle("POST /documents", dah)
+
+	ctxh := contextpost.New(log, emb, llmc, queries, c.MaxContextDocs)
+	mux.Handle("POST /context", ctxh)
+
+	chp := chatpost.New(log, llmc)
+	mux.Handle("POST /chat", chp)
 
 	qph := querypost.New(log, emb, llmc, queries, c.MaxContextDocs, systemPrompt, pf)
 	mux.Handle("POST /query", qph)

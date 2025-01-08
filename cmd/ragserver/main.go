@@ -13,6 +13,8 @@ import (
 type CLI struct {
 	Serve   ServeCommand   `cmd:"serve" help:"Start the RAG server."`
 	Import  ImportCommand  `cmd:"import" help:"Import documents into a RAG server."`
+	Context ContextCommand `cmd:"context" help:"Get similar documents for a piece of text."`
+	Chat    ChatCommand    `cmd:"chat" help:"Chat with the RAG server."`
 	Query   QueryCommand   `cmd:"query" help:"Query the RAG store and LLM."`
 	Version VersionCommand `cmd:"version" help:"Print the version of the RAG server."`
 }

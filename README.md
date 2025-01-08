@@ -4,8 +4,18 @@
 
 ### db-run
 
+interactive: true
+
 ```bash
 rqlited -auth=auth.json -extensions-path="${SQLITE_VEC_PATH}" ~/ragserver
+```
+
+### db-shell
+
+interactive: true
+
+```bash
+rqlite --user='admin:secret'
 ```
 
 ### db-migration-create
@@ -33,7 +43,7 @@ go run ./cmd/ragserver/ serve --rqlite-url "http://admin:secret@localhost:4001"
 interactive: true
 
 ```bash
-go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags"
+go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags" --rag-server-api-key "test-api-key"
 ```
 
 ### import-dry-run
@@ -44,12 +54,28 @@ interactive: true
 go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags" --dry-run --id 1umn2j19hi2bjrw
 ```
 
+### context
+
+interactive: true
+
+```bash
+go run ./cmd/ragserver context --text="What is the plan to destroy the Death Star?" --rag-server-api-key="test-api-key" --pretty=false
+```
+
+### chat
+
+interactive: true
+
+```bash
+go run ./cmd/ragserver chat --rag-server-api-key="test-api-key"
+```
+
 ### query-context
 
 interactive: true
 
 ```bash
-go run ./cmd/ragserver query -q "What is the plan to destroy the Death Star?"
+go run ./cmd/ragserver query -q "What is the plan to destroy the Death Star?" --rag-server-api-key="test-api-key"
 ```
 
 ### query-nocontext

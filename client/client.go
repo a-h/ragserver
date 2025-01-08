@@ -32,12 +32,32 @@ func (c Client) DocumentsPut(ctx context.Context, req models.DocumentsPostReques
 	return jsonapi.Post[models.DocumentsPostRequest, models.DocumentsPostResponse](ctx, url, req, jsonapi.WithRequestHeader("Authorization", c.apiKey))
 }
 
+func (c Client) ContextPost(ctx context.Context, req models.ContextPostRequest) (resp models.ContextPostResponse, err error) {
+	url, err := jsonapi.URL(c.baseURL).Path("context").String()
+	if err != nil {
+		return resp, err
+	}
+	return jsonapi.Post[models.ContextPostRequest, models.ContextPostResponse](ctx, url, req, jsonapi.WithRequestHeader("Authorization", c.apiKey))
+}
+
+func (c Client) ChatPost(ctx context.Context, request models.ChatPostRequest, f func(ctx context.Context, chunk []byte) error) (err error) {
+	url, err := jsonapi.URL(c.baseURL).Path("chat").String()
+	if err != nil {
+		return err
+	}
+	return c.postStream(ctx, url, request, f)
+}
+
 func (c Client) QueryPost(ctx context.Context, request models.QueryPostRequest, f func(ctx context.Context, chunk []byte) error) (err error) {
 	url, err := jsonapi.URL(c.baseURL).Path("query").String()
 	if err != nil {
 		return err
 	}
-	buf, err := json.Marshal(request)
+	return c.postStream(ctx, url, request, f)
+}
+
+func (c Client) postStream(ctx context.Context, url string, req any, f func(ctx context.Context, chunk []byte) error) (err error) {
+	buf, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
