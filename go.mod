@@ -12,6 +12,7 @@ require (
 	github.com/rqlite/gorqlite v0.0.0-20241013203532-4385768ae85d
 	github.com/rs/cors v1.11.1
 	github.com/tmc/langchaingo v0.1.12
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

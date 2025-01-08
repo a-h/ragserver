@@ -6,19 +6,21 @@ import (
 	"iter"
 	"log/slog"
 	"net/url"
-	"strings"
 
 	"github.com/a-h/ragserver/client"
 	"github.com/a-h/ragserver/models"
 	"github.com/pluja/pocketbase"
+	"gopkg.in/yaml.v3"
 )
 
 type ImportCommand struct {
 	RAGServerURL    string `help:"The URL of the RAG server." env:"RAG_SERVER_URL" default:"http://localhost:9020"`
 	RAGServerAPIKey string `help:"The API key for the RAG server." env:"RAG_SERVER_API_KEY" default:""`
 	PocketbaseURL   string `help:"The URL of the Pocketbase server." env:"POCKETBASE_URL" default:"http://localhost:8080"`
+	ID              string `help:"The ID of the document to import if you just want to import a single doc." env:"ID" default:""`
 	Collection      string `help:"The name of the collection to export from." env:"COLLECTION" default:"entities"`
 	Expand          string `help:"The fields to expand." env:"EXPAND" default:""`
+	DryRun          bool   `help:"Do not actually import the documents." env:"DRY_RUN" default:"false"`
 	LogLevel        string `help:"The log level to use." env:"LOG_LEVEL" default:"info"`
 }
 
@@ -29,17 +31,24 @@ func (c ImportCommand) Run(ctx context.Context) (err error) {
 
 	pbe := NewPocketbaseExporter(pocketbase.NewClient(c.PocketbaseURL), c.Collection, c.Expand)
 	for doc := range pbe.Export(ctx) {
-		log.Info("importing document", slog.String("url", doc.URL))
+		if c.ID != "" && doc.ID != c.ID {
+			continue
+		}
+		log.Info("importing document", slog.String("url", doc.Document.URL))
 		if log.Enabled(ctx, slog.LevelInfo) {
-			fmt.Println(doc.Text)
+			fmt.Println(doc.Document.Text)
+		}
+		if c.DryRun {
+			log.Info("skipping document import in dry run mode", slog.String("url", doc.Document.URL))
+			continue
 		}
 		resp, err := rsc.DocumentsPut(ctx, models.DocumentsPostRequest{
-			Document: doc,
+			Document: doc.Document,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to put document: %w", err)
 		}
-		log.Info("document imported", slog.String("url", doc.URL), slog.Int64("id", resp.ID))
+		log.Info("document imported", slog.String("url", doc.Document.URL), slog.Int64("id", resp.ID))
 	}
 	return pbe.Error
 }
@@ -62,9 +71,9 @@ type PocketbaseExporter struct {
 	Error      error
 }
 
-func (p *PocketbaseExporter) Export(ctx context.Context) iter.Seq[models.Document] {
+func (p *PocketbaseExporter) Export(ctx context.Context) iter.Seq[ExportedDocument] {
 	var page int
-	return func(yield func(models.Document) bool) {
+	return func(yield func(ExportedDocument) bool) {
 		for {
 			if ctx.Err() != nil {
 				return
@@ -104,40 +113,103 @@ func useItemOrDefault(item map[string]any, keys []string, defaultValue string) s
 	return defaultValue
 }
 
-func (p *PocketbaseExporter) createDocument(item map[string]any) (d models.Document) {
-	d.URL = useItemOrDefault(item, []string{"url"}, fmt.Sprintf("%s/%s", url.PathEscape(p.collection), url.PathEscape(item["id"].(string))))
-	d.Title = useItemOrDefault(item, []string{"title", "name"}, "Untitled")
-	d.Text = getTextFromValue(0, item)
-	d.Summary = useItemOrDefault(item, []string{"summary"}, "")
+type ExportedDocument struct {
+	ID       string
+	Document models.Document
+}
+
+func (p *PocketbaseExporter) createDocument(item map[string]any) (ed ExportedDocument) {
+	ed.ID = item["id"].(string)
+	ed.Document.URL = useItemOrDefault(item, []string{"url"}, fmt.Sprintf("%s/%s", url.PathEscape(p.collection), url.PathEscape(item["id"].(string))))
+	ed.Document.Title = useItemOrDefault(item, []string{"title", "name"}, "Untitled")
+	recursivelyApplyExpandedFields(item)
+	recursivelyRemoveKeys(item, []string{"id", "collectionId", "collectionName", "created", "updated"})
+	out, _ := yaml.Marshal(item)
+	ed.Document.Text = string(out)
+	ed.Document.Summary = useItemOrDefault(item, []string{"summary"}, "")
 	return
 }
 
-func getTextFromValue(depth int, value any) string {
-	switch v := value.(type) {
+func applyExpandedFields(data map[string]any) (changed bool) {
+	for key, value := range data {
+		if key == "expand" {
+			expandMap, ok := value.(map[string]any)
+			if !ok {
+				continue
+			}
+
+			// Check parent keys for matches in expand.
+			for parentKey := range data {
+				if parentKey == "expand" {
+					continue
+				}
+				if expandedValue, found := expandMap[parentKey]; found {
+					data[parentKey] = expandedValue
+					changed = true
+				}
+			}
+
+			// Remove expand key.
+			delete(data, "expand")
+			changed = true
+		} else if nestedMap, ok := value.(map[string]any); ok {
+			// Recurse into nested maps.
+			if applyExpandedFields(nestedMap) {
+				changed = true
+			}
+		} else if nestedSlice, ok := value.([]any); ok {
+			// Recurse into slices.
+			for _, item := range nestedSlice {
+				if itemMap, isMap := item.(map[string]any); isMap {
+					if applyExpandedFields(itemMap) {
+						changed = true
+					}
+				}
+			}
+		}
+	}
+
+	return changed
+}
+
+func recursivelyApplyExpandedFields(data map[string]any) {
+	for {
+		if changesMade := applyExpandedFields(data); !changesMade {
+			return
+		}
+	}
+}
+
+func recursivelyRemoveKeys(item any, keys []string) {
+	switch item := item.(type) {
 	case map[string]any:
-		var sb strings.Builder
-		for key, item := range v {
-			sb.WriteString(strings.Repeat("#", depth+1))
-			sb.WriteString(" ")
-			sb.WriteString(key)
-			sb.WriteString("\n\n")
-			sb.WriteString(getTextFromValue(depth+1, item))
-			sb.WriteString("\n\n")
+		for _, key := range keys {
+			delete(item, key)
 		}
-		return sb.String()
-	case float64:
-		return fmt.Sprintf("%f", v)
-	case string:
-		return v
+		var emptyKeys []string
+		for k, v := range item {
+			switch v := v.(type) {
+			case map[string]any:
+				if len(v) == 0 {
+					emptyKeys = append(emptyKeys, k)
+				}
+			case []any:
+				if len(v) == 0 {
+					emptyKeys = append(emptyKeys, k)
+				}
+			case string:
+				if v == "" {
+					emptyKeys = append(emptyKeys, k)
+				}
+			}
+			recursivelyRemoveKeys(v, keys)
+		}
+		for _, key := range emptyKeys {
+			delete(item, key)
+		}
 	case []any:
-		var sb strings.Builder
-		for _, item := range v {
-			sb.WriteString(" - ")
-			sb.WriteString(getTextFromValue(depth+1, item))
-			sb.WriteString("\n")
+		for _, value := range item {
+			recursivelyRemoveKeys(value, keys)
 		}
-		return sb.String()
-	default:
-		return fmt.Sprintf("%v", value)
 	}
 }

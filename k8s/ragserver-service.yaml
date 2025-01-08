@@ -5,6 +5,7 @@ metadata:
     service: ragserver
   name: ragserver
 spec:
+  type: LoadBalancer
   ports:
     - name: "9020"
       port: 9020

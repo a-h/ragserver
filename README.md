@@ -25,7 +25,7 @@ go test ./...
 ENV: RQLITE_URL=http://admin:secret@localhost:4001
 
 ```bash
-go run ./cmd/ragserver/ serve
+go run ./cmd/ragserver/ serve --rqlite-url "http://admin:secret@localhost:4001"
 ```
 
 ### import
@@ -33,7 +33,15 @@ go run ./cmd/ragserver/ serve
 interactive: true
 
 ```bash
-go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,dependsOn,contributesTo,tags"
+go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags"
+```
+
+### import-dry-run
+
+interactive: true
+
+```bash
+go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags" --dry-run --id 1umn2j19hi2bjrw
 ```
 
 ### query-context

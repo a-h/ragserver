@@ -31,6 +31,8 @@ spec:
             - name: ragserver-apikeys
               mountPath: /mnt/secrets/apikeys
           env:
+            - name: LISTEN_ADDR
+              value: 0.0.0.0:9020
             - name: RQLITE_URL
               value: http://admin:secret@rqlite.ragserver.svc.cluster.local:4001
             - name: API_KEYS_FILE

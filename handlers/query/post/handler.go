@@ -3,6 +3,7 @@ package post
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -63,7 +64,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var docs []db.DocumentSelectNearestResult
 
-	if !req.NoContext {
+	if !req.NoContext && req.Text != "" {
 		embedding, err := h.embedder.EmbedQuery(r.Context(), req.Text)
 		if err != nil {
 			h.log.Error("failed to embed query", slog.Any("error", err))
@@ -87,10 +88,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var sb strings.Builder
 	for _, doc := range docs {
-		sb.WriteString("Context from ")
-		sb.WriteString(doc.Title)
-		sb.WriteString(" - ")
-		sb.WriteString(doc.URL)
+		sb.WriteString(fmt.Sprintf("## Context from URL: %q, title: %q\n", doc.URL, doc.Title))
 		sb.WriteString("\n")
 		sb.WriteString(doc.Text)
 		sb.WriteString("\n")
@@ -102,7 +100,7 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	docIDs := make([]db.DocumentID, 0, len(docs))
+	docIDs := make([]db.DocumentID, len(docs))
 	for i, doc := range docs {
 		docIDs[i] = db.DocumentID{
 			Partition: user,
