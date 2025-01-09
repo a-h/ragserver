@@ -31,8 +31,8 @@
                 src = prev.fetchFromGitHub {
                   owner = "rqlite";
                   repo = "rqlite";
-                  rev = "v8.36.3";
-                  hash = "sha256-Q5taKIs3kjB1KrIxRO27/sbhamta9ljO+btghJ+M5zE=";
+                  rev = "v8.36.4";
+                  hash = "sha256-kscSjT83wLiTgY6fOuvP2KnIXDTwmgHIAvNRq4IMawg=";
                 };
                 vendorHash = "sha256-lMDE8M8O6HIJE585OaI1islvffVHncr5CwLoVVSCOh4=";
               });
