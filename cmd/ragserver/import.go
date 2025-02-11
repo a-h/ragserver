@@ -3,13 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"iter"
 	"log/slog"
+	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/a-h/ragserver/client"
 	"github.com/a-h/ragserver/models"
 	"github.com/pluja/pocketbase"
+	"github.com/tmc/langchaingo/documentloaders"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,6 +26,7 @@ type ImportCommand struct {
 	ID              string `help:"The ID of the document to import if you just want to import a single doc." env:"ID" default:""`
 	Collection      string `help:"The name of the collection to export from." env:"COLLECTION" default:"entities"`
 	Expand          string `help:"The fields to expand." env:"EXPAND" default:""`
+	Files           string `help:"Comma separated list of fields that contain Pocketbase file references." env:"FILES" default:""`
 	DryRun          bool   `help:"Do not actually import the documents." env:"DRY_RUN" default:"false"`
 	LogLevel        string `help:"The log level to use." env:"LOG_LEVEL" default:"info"`
 }
@@ -29,7 +36,7 @@ func (c ImportCommand) Run(ctx context.Context) (err error) {
 
 	rsc := client.New(c.RAGServerURL, c.RAGServerAPIKey)
 
-	pbe := NewPocketbaseExporter(pocketbase.NewClient(c.PocketbaseURL), c.Collection, c.Expand)
+	pbe := NewPocketbaseExporter(c.PocketbaseURL, pocketbase.NewClient(c.PocketbaseURL), c.Collection, c.Expand, c.Files)
 	for doc := range pbe.Export(ctx) {
 		if c.ID != "" && doc.ID != c.ID {
 			continue
@@ -53,20 +60,25 @@ func (c ImportCommand) Run(ctx context.Context) (err error) {
 	return pbe.Error
 }
 
-func NewPocketbaseExporter(client *pocketbase.Client, collection, expand string) *PocketbaseExporter {
+func NewPocketbaseExporter(baseURL string, client *pocketbase.Client, collection, expand, files string) *PocketbaseExporter {
 	return &PocketbaseExporter{
+		baseURL:    baseURL,
 		client:     client,
 		collection: collection,
 		expand:     expand,
+		files:      strings.Split(files, ","),
 		PageSize:   10,
 		Error:      nil,
 	}
 }
 
 type PocketbaseExporter struct {
+	// baseURL for downloading files, e.g. http://localhost:8090
+	baseURL    string
 	client     *pocketbase.Client
 	collection string
 	expand     string
+	files      []string
 	PageSize   int
 	Error      error
 }
@@ -96,7 +108,7 @@ func (p *PocketbaseExporter) Export(ctx context.Context) iter.Seq[ExportedDocume
 				return
 			}
 			for _, item := range response.Items {
-				if !yield(p.createDocument(item)) {
+				if !yield(p.createDocument(ctx, item)) {
 					return
 				}
 			}
@@ -118,16 +130,99 @@ type ExportedDocument struct {
 	Document models.Document
 }
 
-func (p *PocketbaseExporter) createDocument(item map[string]any) (ed ExportedDocument) {
+func (p *PocketbaseExporter) createDocument(ctx context.Context, item map[string]any) (ed ExportedDocument) {
 	ed.ID = item["id"].(string)
 	ed.Document.URL = useItemOrDefault(item, []string{"url"}, fmt.Sprintf("%s/%s", url.PathEscape(p.collection), url.PathEscape(item["id"].(string))))
 	ed.Document.Title = useItemOrDefault(item, []string{"title", "name"}, "Untitled")
 	recursivelyApplyExpandedFields(item)
 	recursivelyRemoveKeys(item, []string{"id", "collectionId", "collectionName", "created", "updated"})
-	out, _ := yaml.Marshal(item)
-	ed.Document.Text = string(out)
 	ed.Document.Summary = useItemOrDefault(item, []string{"summary"}, "")
+
+	sb := new(strings.Builder)
+	_ = yaml.NewEncoder(sb).Encode(item)
+
+	for _, fileFieldName := range p.files {
+		if ctx.Err() != nil {
+			return
+		}
+		fileNames, fileNamesFieldExists := item[fileFieldName].([]any)
+		if !fileNamesFieldExists || len(fileNames) == 0 {
+			continue
+		}
+		for _, fileName := range fileNames {
+			// Check if the file name is a string.
+			fileName, ok := fileName.(string)
+			if !ok {
+				p.Error = fmt.Errorf("file name is not a string")
+				continue
+			}
+			if !strings.EqualFold(filepath.Ext(fileName), ".pdf") {
+				continue
+			}
+			// Get the file text.
+			fileText, err := p.getPDFText(ctx, p.collection, ed.ID, fileName)
+			if err != nil {
+				p.Error = fmt.Errorf("failed to get file text: %w", err)
+				continue
+			}
+			sb.WriteString(fileText)
+		}
+	}
+
+	ed.Document.Text = sb.String()
+
 	return
+}
+
+func (p *PocketbaseExporter) getPDFText(ctx context.Context, collection, id, filename string) (string, error) {
+	// Start download.
+	downloadURL, err := createURL(p.baseURL, "api", "files", collection, id, filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to create download URL: %w", err)
+	}
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Create temp file.
+	pdfFile, err := os.CreateTemp("", "rag-import-*.pdf")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary file: %w", err)
+	}
+	defer pdfFile.Close()
+	defer os.Remove(pdfFile.Name())
+
+	// Write the HTTP response to the file.
+	fileSize, err := io.Copy(pdfFile, resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to write file: %w", err)
+	}
+
+	// Read the PDF text.
+	pdf := documentloaders.NewPDF(pdfFile, fileSize)
+	docs, err := pdf.Load(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to load PDF: %w", err)
+	}
+
+	// Create the output.
+	var sb strings.Builder
+	for _, doc := range docs {
+		sb.WriteString(doc.PageContent)
+		sb.WriteString("\n")
+	}
+	return sb.String(), nil
+}
+
+func createURL(baseURL string, pathSegments ...string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse baseURL: %w", err)
+	}
+	u.Path = strings.Join(pathSegments, "/")
+	return u.String(), nil
 }
 
 func applyExpandedFields(data map[string]any) (changed bool) {

@@ -43,7 +43,7 @@ go run ./cmd/ragserver/ serve --rqlite-url "http://admin:secret@localhost:4001"
 interactive: true
 
 ```bash
-go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags" --rag-server-api-key "test-api-key"
+go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags" --files="attachments" --rag-server-api-key "test-api-key"
 ```
 
 ### import-dry-run
@@ -51,7 +51,7 @@ go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,d
 interactive: true
 
 ```bash
-go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags" --dry-run --id 1umn2j19hi2bjrw
+go run ./cmd/ragserver/ import --collection "entities" --expand "contacts,tags,dependsOn,dependsOn.contacts,dependsOn.tags,contributesTo,contributesTo.contacts,contributesTo.tags" --files="attachments" --dry-run --id lyo5pgij6hcwx4j
 ```
 
 ### context
