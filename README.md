@@ -110,6 +110,20 @@ nix run
 nix develop
 ```
 
+### update-version
+
+```
+version set
+```
+
+### push-tag
+
+Push a semantic version number.
+
+```sh
+version push
+```
+
 ### docker-build-aarch64
 
 ```bash
@@ -125,12 +139,13 @@ nix build .#packages.x86_64-linux.docker-image
 ### crane-push-app
 
 env: CONTAINER_REGISTRY=ghcr.io/ragserver
+env: VERSION=$(version get)
 
 ```bash
 nix build .#packages.x86_64-linux.docker-image
 cp ./result /tmp/ragserver.tar.gz
 gunzip -f /tmp/ragserver.tar.gz
-crane push /tmp/ragserver.tar ${CONTAINER_REGISTRY}/ragserver:v0.0.1
+crane push /tmp/ragserver.tar "${CONTAINER_REGISTRY}/ragserver:${VERSION}"
 ```
 
 ### docker-load
@@ -210,6 +225,7 @@ envsubst < k8s/local/volume.yaml | kubectl --namespace ragserver apply -f -
 ### k8s-apply
 
 env: CONTAINER_REGISTRY=ghcr.io/ragserver
+env: VERSION=$(version get)
 dir: k8s
 interactive: true
 

@@ -5,13 +5,17 @@
       url = "github:hercules-ci/gitignore.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    version = {
+      url = "github:a-h/version";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     xc = {
       url = "github:joerdav/xc";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
-  outputs = { self, nixpkgs, gitignore, xc }:
+  outputs = { self, nixpkgs, gitignore, version, xc }:
     let
       allSystems = [
         "x86_64-linux" # 64-bit Intel/AMD Linux
@@ -55,6 +59,7 @@
                   runHook postInstall
                 '';
               });
+              version = version.packages.${system}.default;
               xc = xc.packages.${system}.xc;
             })
           ];
@@ -87,25 +92,29 @@
         echo "user:x:1000:" > $out/etc/group
         echo "user:!:1::::::" > $out/etc/shadow
       '';
-      dockerImage = { name, pkgs, system }: pkgs.dockerTools.buildImage {
-        name = name;
-        tag = "latest";
+      dockerImage = { name, pkgs, system }:
+        let
+          versionNumber = builtins.readFile ./.version;
+        in
+        pkgs.dockerTools.buildImage {
+          name = name;
+          tag = versionNumber;
 
-        copyToRoot = [
-          # Remove coreutils and bash for a smaller container.
-          pkgs.coreutils
-          pkgs.bash
-          (dockerUser pkgs)
-          (app { inherit name pkgs system; })
-        ];
-        config = {
-          Cmd = [ "ragserver" "serve" ];
-          User = "user:user";
-          ExposedPorts = {
-            "9020/tcp" = { };
+          copyToRoot = [
+            # Remove coreutils and bash for a smaller container.
+            pkgs.coreutils
+            pkgs.bash
+            (dockerUser pkgs)
+            (app { inherit name pkgs system; })
+          ];
+          config = {
+            Cmd = [ "ragserver" "serve" ];
+            User = "user:user";
+            ExposedPorts = {
+              "9020/tcp" = { };
+            };
           };
         };
-      };
 
       rqliteDockerImage = { pkgs, system }: pkgs.dockerTools.buildImage {
         name = "rqlite";
@@ -144,6 +153,7 @@
         pkgs.envsubst
         pkgs.kubectl
         pkgs.k9s
+        pkgs.version
         # Database tools.
         pkgs.rqlite # Distributed sqlite.
         pkgs.go-migrate # Migrate database schema.

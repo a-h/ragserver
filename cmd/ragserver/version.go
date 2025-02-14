@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-)
 
-var version string
+	"github.com/a-h/ragserver"
+)
 
 type VersionCommand struct {
 }
 
 func (c VersionCommand) Run(ctx context.Context) (err error) {
-	fmt.Println(version)
+	fmt.Println(ragserver.Version)
 	return nil
 }

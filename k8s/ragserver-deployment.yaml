@@ -20,7 +20,7 @@ spec:
         service: ragserver
     spec:
       containers:
-        - image: ${CONTAINER_REGISTRY}/ragserver:v0.0.1
+        - image: ${CONTAINER_REGISTRY}/ragserver:${VERSION}
           imagePullPolicy: Always
           name: ragserver
           ports:

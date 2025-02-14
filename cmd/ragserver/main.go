@@ -7,6 +7,7 @@ import (
 
 	_ "embed"
 
+	"github.com/a-h/ragserver"
 	"github.com/alecthomas/kong"
 )
 
@@ -42,7 +43,8 @@ func getLogger(level string) *slog.Logger {
 	case "error":
 		ll = slog.LevelError
 	}
-	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+	l := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
 		Level: ll,
 	}))
+	return l.With(slog.String("v", ragserver.Version))
 }
